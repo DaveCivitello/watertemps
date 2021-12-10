@@ -1,0 +1,107 @@
+---
+title: "watertemps"
+author: "DJC"
+date: "12/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Analysis of water temperature time series
+
+
+
+```{r packages}
+
+library("mgcv")
+library("gratia")
+library("itsadug")
+library("chron")
+
+```
+
+
+```{r import_data}
+
+setwd("P:/Emory/Projects/Kenya Temperature/Data sets")
+# This finds all of the files
+inputs = dir(getwd(), pattern=".csv")
+temp_set = list()
+
+# This processes HOBOlogger data into a format usable for the analysis
+for(i in 1:length(inputs)){
+  temp_set[[i]] = read.csv(inputs[i], skip=1) # imports data set, skipping over HOBO-logger formatting
+  temp_set[[i]] = cbind(temp_set[[i]], "Site" = inputs[i]) # Adds site name
+  colnames(temp_set[[i]]) = c("obs", "time", "temp", "site")
+  # Converts to a usable format
+  temp_set[[i]][,"time"] = as.POSIXct(temp_set[[i]][,"time"], format="%m/%d/%Y %I:%M:%S %p")
+  # converts to days since 1/1/2019
+  temp_set[[i]][,"days"] =as.numeric(julian(temp_set[[i]][,"time"], origin="0018-01-01 LMT"))
+  temp_set[[i]][,"day_of_year"] = round(temp_set[[i]][,"days"] %% 365, digits=0)
+  temp_set[[i]][,"hour"] = temp_set[[i]][,"days"] %% 1
+}
+
+# File 2 has a different time format
+temp_set[[2]] = read.csv(inputs[2], skip=1)
+temp_set[[2]] = cbind(temp_set[[2]], "Site" = inputs[2])
+colnames(temp_set[[2]]) = c("obs", "time", "temp", "site")
+temp_set[[2]][,"time"] = as.POSIXct(temp_set[[2]][,"time"], format="%m/%d/%y %I:%M %p")
+head(temp_set[[2]])
+
+temp_set[[2]][,"days"] =as.numeric(julian(temp_set[[2]][,"time"], origin="0018-01-01 LMT"))
+temp_set[[2]][,"day_of_year"] = round(temp_set[[2]][,"days"] %% 365, digits=0)
+temp_set[[2]][,"hour"] = temp_set[[2]][,"days"] %% 1
+
+```
+
+```{r GAMMs}
+
+### Individual data sets
+m1 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[1]])
+summary(m1)
+draw(m1)
+
+m2 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[2]])
+summary(m2)
+draw(m2)
+
+m3 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[3]])
+summary(m3)
+draw(m3)
+
+m4 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[4]])
+summary(m4)
+draw(m4)
+
+m5 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[5]])
+summary(m5)
+draw(m5)
+
+m6 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[6]])
+summary(m6)
+draw(m6)
+
+m7 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[7]])
+summary(m7)
+draw(m7)
+
+m8 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[8]])
+summary(m8)
+draw(m8)
+
+m9 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[9]])
+summary(m9)
+draw(m9)
+
+m10 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[10]])
+summary(m10)
+draw(m10)
+
+m11 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[11]])
+summary(m11)
+draw(m11)
+
+```
+
