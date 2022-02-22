@@ -19,15 +19,20 @@ library("mgcv")
 library("gratia")
 library("itsadug")
 library("chron")
+library("pammtools")
+library("ggplot2")
 
 ```
 
 
 ```{r import_data}
 
-setwd("P:/Emory/Projects/Kenya Temperature/Data sets")
+#setwd("P:/Emory/Projects/Kenya Temperature/Data sets")
+setwd("C:/Users/dcivite/Desktop/Trip docs 2/Temperature stuff/Data sets")
 # This finds all of the files
-inputs = dir(getwd(), pattern=".csv")
+#inputs = dir("P:/Emory/Projects/Kenya Temperature/Data sets", pattern=".csv")
+inputs = dir("C:/Users/dcivite/Desktop/Trip docs 2/Temperature stuff/Data sets", pattern=".csv")
+
 temp_set = list()
 
 # This processes HOBOlogger data into a format usable for the analysis
@@ -36,23 +41,14 @@ for(i in 1:length(inputs)){
   temp_set[[i]] = cbind(temp_set[[i]], "Site" = inputs[i]) # Adds site name
   colnames(temp_set[[i]]) = c("obs", "time", "temp", "site")
   # Converts to a usable format
-  temp_set[[i]][,"time"] = as.POSIXct(temp_set[[i]][,"time"], format="%m/%d/%Y %I:%M:%S %p")
+  temp_set[[i]][,"time"] = as.POSIXct(temp_set[[i]][,"time"], format="%m/%d/%Y %H:%M")
   # converts to days since 1/1/2019
   temp_set[[i]][,"days"] =as.numeric(julian(temp_set[[i]][,"time"], origin="0018-01-01 LMT"))
   temp_set[[i]][,"day_of_year"] = round(temp_set[[i]][,"days"] %% 365, digits=0)
   temp_set[[i]][,"hour"] = temp_set[[i]][,"days"] %% 1
 }
 
-# File 2 has a different time format
-temp_set[[2]] = read.csv(inputs[2], skip=1)
-temp_set[[2]] = cbind(temp_set[[2]], "Site" = inputs[2])
-colnames(temp_set[[2]]) = c("obs", "time", "temp", "site")
-temp_set[[2]][,"time"] = as.POSIXct(temp_set[[2]][,"time"], format="%m/%d/%y %I:%M %p")
-head(temp_set[[2]])
-
-temp_set[[2]][,"days"] =as.numeric(julian(temp_set[[2]][,"time"], origin="0018-01-01 LMT"))
-temp_set[[2]][,"day_of_year"] = round(temp_set[[2]][,"days"] %% 365, digits=0)
-temp_set[[2]][,"hour"] = temp_set[[2]][,"days"] %% 1
+temp_set[[1]]
 
 ```
 
@@ -104,4 +100,36 @@ summary(m11)
 draw(m11)
 
 ```
+
+```{r}
+# For now, trying to analyze several sites together
+clean_sets = lapply(temp_set, subset, select = c("obs", "temp", "site", "hour", "day_of_year"))
+many_sites = rbind(clean_sets[[2]], clean_sets[[3]], clean_sets[[4]], clean_sets[[5]], clean_sets[[7]],  clean_sets[[10]])
+unique(many_sites$site)
+many_sites$sites = as.factor(many_sites$site)
+
+```
+
+```{r}
+many_sites$site = as.factor(many_sites$site)
+
+m12 =bam(temp ~ site + te(hour, day_of_year, bs="cc", k=19), method="REML", data=many_sites) # Model G in the HGAM paper
+summary(m12)
+#draw(m12)
+gg_tensor(x = m12, ci=FALSE)
+
+m13 =bam(temp ~ site + te(hour, day_of_year, bs="cc", k=19)
+                     + t2(hour, day_of_year, site, bs=c("cc", "cc", "re"), k=c(10, 10, 7), m=2, full=TRUE), method="REML",
+         data=many_sites) # Model GS in the HGAM paper
+summary(m13)
+#draw(m13)
+gg_tensor(x = m13, ci=FALSE)
+draw(m13)
+unique(many_sites$site)
+
+AIC(m12) - AIC(m13) # Overhwleming evidence for variable 
+# Make plot for obs vs. predicted temperature from all sites
+
+```
+
 
