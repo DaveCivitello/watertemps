@@ -119,17 +119,54 @@ summary(m12)
 gg_tensor(x = m12, ci=FALSE)
 
 m13 =bam(temp ~ site + te(hour, day_of_year, bs="cc", k=19)
-                     + t2(hour, day_of_year, site, bs=c("cc", "cc", "re"), k=c(10, 10, 7), m=2, full=TRUE), method="REML",
+                     + t2(hour, day_of_year, site, bs=c("cc", "cc", "re"), k=c(10, 10, 7), m=2, full=TRUE),
+         method="REML",
          data=many_sites) # Model GS in the HGAM paper
 summary(m13)
 #draw(m13)
 gg_tensor(x = m13, ci=FALSE)
 draw(m13)
-unique(many_sites$site)
 
-AIC(m12) - AIC(m13) # Overhwleming evidence for variable 
+m14 =bam(temp ~ site + te(hour, day_of_year, bs="cc", k=19, m=2)
+                     + te(hour, day_of_year, by=site, bs=c("cc", "cc"), k=c(10, 10), m=1),
+         method="REML",
+         data=many_sites) # Model GI in the HGAM paper
+summary(m14)
+gg_tensor(x = m14, ci=FALSE)
+draw(m14)
+gam.check(m14)
+
+#bbmle::AICtab(m12, m13, 14) # model G is super stinky. Checking model GI vs model GS
+AIC(m14) - AIC(m13) # model G is super stinky. Checking model GI vs model GS
+
 # Make plot for obs vs. predicted temperature from all sites
+p14 = predict.gam(m14, newdata=many_sites)
+tail(p14)
+dim(many_sites); length(p14)
 
+pred.obs.df = data.frame(many_sites, "Predicted" = p14)
+ggplot(data=pred.obs.df, aes(x=Predicted, y=temp)) + geom_point() + geom_abline() + 
+ facet_grid(. ~ site)
 ```
 
+```{r DTR}
+# Visualize some diurnal temperature range data
+head(many_sites)
+maxx = aggregate(temp ~ site*day_of_year, FUN=max, data=many_sites)
+head(maxx)
+minn = aggregate(temp ~ site*day_of_year, FUN=min, data=many_sites)
+head(minn)
+
+DTR = data.frame(maxx, "min" = minn$temp, "DTR" = maxx$temp - minn$temp, drop=F)
+head(DTR)
+colnames(DTR)[3] = "max"
+
+head(DTR)
+
+ggplot(data=DTR, aes(x=day_of_year, y=DTR, group=site, colour=site)) + geom_line() + theme(legend.position = "none")
+
+m_DTR = gamm(DTR ~ site + s(day_of_year, by=site, bs="cc"), correlation=corCAR1(form=~day_of_year|site), data=DTR)
+summary(m_DTR$gam)
+plot(m_DTR$gam)
+```
 
