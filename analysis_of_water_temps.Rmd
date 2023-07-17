@@ -37,216 +37,35 @@ temp_set = list()
 
 # This processes HOBOlogger data into a format usable for the analysis
 for(i in 1:length(inputs)){
-  temp_set[[i]] = read.csv(inputs[i], skip=1) # imports data set, skipping over HOBO-logger formatting
+  temp_set[[i]] = read.csv(inputs[i], skip=1)[,1:3] # imports data set, skipping over HOBO-logger formatting and keeping first 3 columns
   temp_set[[i]] = cbind(temp_set[[i]], "Site" = inputs[i]) # Adds site name
-  colnames(temp_set[[i]]) = c("obs", "time", "temp","Elevation", "Species", "Habitat", "site")
+  colnames(temp_set[[i]]) = c("obs", "time", "temp", "site")
   # Converts to a usable format
   temp_set[[i]][,"time"] = as.POSIXct(temp_set[[i]][,"time"], format="%m/%d/%Y %H:%M")
   # converts to days since 1/1/2018
   temp_set[[i]][,"days"] =as.numeric(julian(temp_set[[i]][,"time"], origin="2018-01-01 LMT"))
   temp_set[[i]][,"day_of_year"] = round(temp_set[[i]][,"days"] %% 365, digits=0)
-  temp_set[[i]][,"hour"] = temp_set[[i]][,"days"] %% 1
+  temp_set[[i]][,"hour"] = (temp_set[[i]][,"days"] %% 1)*24
 }
 
-temp_set[[11]]
+temp_set[[3]] # Longest dataset
 
 ```
 
 ```{r GAMMs}
 
 ### Individual data sets
-m1 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[1]])
-summary(m1)
-draw(m1)
-
-m2 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[2]])
-summary(m2)
-draw(m2)
-
-m3 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[3]])
-summary(m3)
-draw(m3)
-
 m4 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[4]])
 summary(m4)
-draw(m4)
+fig_Asao = gg_tensor(m4, n2=100, main="Tensor smooth of diurnal and seasonal differences from mean temperature in Asao stream") + xlab("Hour of day") + ylab("Julian date")
 
-m5 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[5]])
-summary(m5)
-draw(m5)
-
-m6 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[6]])
-summary(m6)
-draw(m6)
-
-m7 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[7]])
-summary(m7)
-draw(m7)
+ggsave(filename = "C:/RData/Asao_smooth.tiff", plot=fig_Asao)
 
 m8 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[8]])
 summary(m8)
-draw(m8)
+fig_Kambu = gg_tensor(m8, n2=100, main="Tensor smooth of diurnal and seasonal differences from mean temperature in Kambu stream") + xlab("Hour of day") + ylab("Julian date")
 
-m9 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[9]])
-summary(m9)
-draw(m9)
-
-m10 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[10]])
-summary(m10)
-draw(m10)
-
-m11 =gam(temp ~ te(hour, day_of_year, bs="cc", k=19), data=temp_set[[11]])
-summary(m11)
-draw(m11)
+ggsave(filename = "C:/RData/Kambu_smooth.tiff", plot=fig_Kambu)
 
 ```
 
-```{r}
-# For now, trying to analyze several sites together
-clean_sets = lapply(temp_set, subset, select = c("obs", "temp", "site", "hour", "day_of_year", "Elevation", "Species", "Habitat"))
-all_sites = rbind(clean_sets[[1]], clean_sets[[2]], clean_sets[[3]], clean_sets[[4]], 
-                  clean_sets[[5]], clean_sets[[6]], clean_sets[[7]], clean_sets[[8]], 
-                  clean_sets[[9]], clean_sets[[10]], clean_sets[[11]])
-many_sites = rbind(clean_sets[[2]], clean_sets[[3]], clean_sets[[4]], clean_sets[[5]], clean_sets[[7]],  clean_sets[[10]])
-unique(many_sites$site)
-many_sites$site = as.factor(many_sites$site)
-all_sites$site = as.factor(all_sites$site)
-all_sites$Habitat = as.factor(all_sites$Habitat)
-
-```
-
-```{r}
-
-# Only elevation and habitat parametric effects
-m0 = bam(temp ~ Elevation + Habitat + s(site, bs="re"), method="ML", data=all_sites) 
-summary(m0)
-
-# Only elevation and habitat parametric effects + Seasonal smooth
-m1 = bam(temp ~ Elevation + Habitat + s(day_of_year) + s(site, bs="re"), method="ML", data=all_sites) 
-summary(m1)
-
-# Only elevation and habitat parametric effects + Seasonal and Diurnal smooths
-m2 = bam(temp ~ Elevation + Habitat + s(day_of_year) + s(hour) + s(site, bs="re"), method="ML", data=all_sites) 
-summary(m2)
-
-#### Starting tensor interaction smooths and using terminology from the hierarchical GAMMs paper ####
-
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth
-m3 =bam(temp ~ Elevation + Habitat + s(site, bs="re") + te(hour, day_of_year, bs="cc"), method="ML", data=all_sites) # Model G in the HGAM paper
-summary(m3)
-plot(m3)
-
-
-
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth by habitat
-m4 =bam(temp ~ Elevation + s(site, bs="re") + 
-          te(hour, day_of_year, bs="cc") +
-          t2(hour, day_of_year, by=Habitat, bs=c("cc", "cc"), full=TRUE),
-        method="ML", data=all_sites) # Model GS in the HGAM paper
-summary(m4)
-gg_tensor(m4)
-
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth by habitat and site
-m5 =bam(temp ~ Elevation + 
-          te(hour, day_of_year, bs="cc") +
-          t2(hour, day_of_year, by=Habitat, bs=c("cc", "cc"), full=TRUE) +
-          t2(hour, day_of_year, by=site, bs=c("cc", "cc"), full=TRUE),
-        method="ML", data=all_sites) # Model GS in the HGAM paper
-summary(m5)
-gg_tensor(m5)
-
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth by site
-m6 =bam(temp ~ Elevation + 
-          te(hour, day_of_year, bs="cc") +
-          t2(hour, day_of_year, by=site, bs=c("cc", "cc"), full=TRUE),
-        method="ML", data=all_sites) # Model GS in the HGAM paper
-summary(m6)
-gg_tensor(m6)
-
-### Models that correspond to HGAM paper's "GI" terminology ###
-
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth by habitat
-m7 =bam(temp ~ Elevation + s(site, bs="re") + 
-          te(hour, day_of_year, bs="cc") +
-          te(hour, day_of_year, by=Habitat, bs=c("cc", "cc")),
-        method="ML", data=all_sites) # Model GI in the HGAM paper
-summary(m7)
-gg_tensor(m7)
-
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth by habitat and site
-m8 =bam(temp ~ Elevation + s(site, bs="re") + 
-          te(hour, day_of_year, bs="cc") +
-          te(hour, day_of_year, by=Habitat, bs=c("cc", "cc")) +
-          te(hour, day_of_year, by=site, bs=c("cc", "cc")),
-        method="ML", data=all_sites) # Model GI in the HGAM paper
-summary(m8)
-gg_tensor(m8)
-
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth by site
-m9 =bam(temp ~ Elevation + s(site, bs="re") + 
-          te(hour, day_of_year, bs="cc") +
-          te(hour, day_of_year, by=site, bs=c("cc", "cc")),
-        method="ML", data=all_sites) # Model GI in the HGAM paper
-summary(m9)
-gg_tensor(m9)
-
-### Models that would be defined as S in HGAM paper terminology ###
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth by site
-m10 =bam(temp ~ Elevation + 
-          t2(hour, day_of_year, by=site, bs=c("cc", "cc"), full=TRUE),
-        method="ML", data=all_sites) # Model S in the HGAM paper
-summary(m10)
-gg_tensor(m10)
-
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth by habitat
-m11 =bam(temp ~ Elevation + 
-          t2(hour, day_of_year, by=Habitat, bs=c("cc", "cc"), full=TRUE),
-        method="ML", data=all_sites) # Model S in the HGAM paper
-summary(m11)
-gg_tensor(m11)
-
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth by habitat and site
-m12 =bam(temp ~ Elevation + 
-          t2(hour, day_of_year, by=Habitat, bs=c("cc", "cc"), full=TRUE) +
-           t2(hour, day_of_year, by=site, bs=c("cc", "cc"), full=TRUE),
-        method="ML", data=all_sites) # Model S in the HGAM paper
-summary(m12)
-gg_tensor(m12)
-
-### Models that would be defined as I in HGAM paper terminology ###
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth by site
-m13 =bam(temp ~ Elevation + Habitat + s(site, bs="re") +
-          te(hour, day_of_year, by=site, bs=c("cc", "cc")),
-        method="ML", data=all_sites) # Model I in the HGAM paper
-summary(m13)
-gg_tensor(m13)
-
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth by habitat
-m14 =bam(temp ~ Elevation + Habitat + s(site, bs="re") +
-          te(hour, day_of_year, by=Habitat, bs=c("cc", "cc")),
-        method="ML", data=all_sites) # Model I in the HGAM paper
-summary(m14)
-gg_tensor(m14)
-
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth by habitat and site
-m15 =bam(temp ~ Elevation + Habitat + s(site, bs="re") +
-          te(hour, day_of_year, by=Habitat, bs=c("cc", "cc")) +
-          te(hour, day_of_year, by=site, bs=c("cc", "cc")),
-        method="ML", data=all_sites) # Model I in the HGAM paper
-summary(m15)
-gg_tensor(m15)
-
-
-# Only elevation and habitat parametric effects + Seasonal-Diurnal interaction smooth by habitat and site
-m16 =bam(temp ~ Elevation + 
-          te(hour, day_of_year, bs="cc") +
-          t2(hour, day_of_year, by=Habitat, bs=c("cc", "cc"), full=TRUE) +
-          t2(hour, day_of_year, by=site, bs=c("cc", "cc"), full=TRUE), select=TRUE,
-        method="ML", data=all_sites) # Model GS with emphasis on global smooth in the HGAM paper
-summary(m16)
-gg_tensor(m16)
-
-library(bbmle)
-AICtab(m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, delta=T, base=T, sort=T, weights=T)
-
-```
